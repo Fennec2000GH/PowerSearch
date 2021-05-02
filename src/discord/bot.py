@@ -93,7 +93,7 @@ async def on_message(message: str):
         if 'summarize' in cmd_list:
             await summarize_cmd(message=message, url=url)
         if 'sentiment' in cmd_list:
-            pass
+            await sentiment_cmd(message=message, url=url)
         if 'topics' in cmd_list:
             await topics_cmd(message=message, url=url)
 
@@ -174,12 +174,13 @@ async def entities_cmd(message: discord.Message, url: str):
     global scraped_content
     global send_raw_cmds
 
+    # scraping must be done first before any analytics commands
+    if len(scraped_content) == 0:
+        await scrape_cmd(message=message, url=url)
+
     # only display printout message for single urls
     if type(url) != list:
         await message.channel.send(content=f'**Fetching entity links for {url}...**')
-
-    if len(scraped_content) == 0:
-        await scrape_cmd(message=message, url=url)
 
     # entity recognition code
     response = scraper.sample_analyze_entities(text_content=scraped_content)
@@ -216,12 +217,13 @@ async def summarize_cmd(message: discord.Message, url: str):
     global scraped_content
     global send_raw_cmds
 
+    # scraping must be done first before any analytics commands
+    if len(scraped_content) == 0:
+        await scrape_cmd(message=message, url=url)
+
     # only display printout message for single urls
     if type(url) != list:
         await message.channel.send(content=f'**Summarizing {url}...**')
-
-    if len(scraped_content) == 0:
-        await scrape_cmd(message=message, url=url)
 
     # summarization code
     model = Summarizer()
@@ -243,6 +245,8 @@ async def summarize_cmd(message: discord.Message, url: str):
             f.close()
         await message.channel.send(file=discord.File(fp='summarize.txt'))
 
+
+
 async def sentiment_cmd(message: discord.Message, url: str):
     """[summary]
 
@@ -253,12 +257,35 @@ async def sentiment_cmd(message: discord.Message, url: str):
     global scraped_content
     global send_raw_cmds
 
-    await message.channel.send(content=f'**Analyzing sentiment for {url}...**')
-
+    # scraping must be done first before any analytics commands
     if len(scraped_content) == 0:
         await scrape_cmd(message=message, url=url)
 
+    # only display printout message for single urls
+    if type(url) != list:
+        await message.channel.send(content=f'**Analyzing sentiment for {url}...**')
+
     # sentiment analysis code
+    response_sentiment = scraper.sample_analyze_sentiment(text_content=scraped_content)
+    score = response_sentiment.document_sentiment.score
+    magnitude = response_sentiment.document_sentiment.magnitude
+    emoticon = scraper.emojify(response=response_sentiment)
+    sentiment_report = f'sentiment score: {score}\nsentiment magnitude: {magnitude}\n{emoticon}\n\n'
+
+    # handling keyword queries
+    if type(url) == list:
+        with open(file='keyword_search.txt', mode='a') as f:
+            f.write("**Analyzing overall sentiment of collected links**\n\n" + sentiment_report + '\n\n')
+            f.close()
+        return
+
+    if 'sentiment' in send_raw_cmds:
+        await message.channel.send(content=sentiment_report)
+    else:
+        with open(file='sentiment.txt', mode='w') as f:
+            f.write(sentiment_report)
+            f.close()
+        await message.channel.send(file=discord.File(fp='sentiment.txt'))
 
 async def topics_cmd(message: discord.Message, url: str):
     """[summary]
@@ -269,13 +296,14 @@ async def topics_cmd(message: discord.Message, url: str):
     """
     global scraped_content
 
-    await message.channel.send(content=f'**Generating topics for {url}...**')
-
+    # scraping must be done first before any analytics commands
     if len(scraped_content) == 0:
         await scrape_cmd(message=message, url=url)
 
+    await message.channel.send(content=f'**Generating topics for {url}...**')
     await message.channel.send(content=f'**Length of scraped content: {len(scraped_content)}**')
-    wc = WordCloud(background_color = 'white', max_words=20, stopwords=set(STOPWORDS)).generate(text=str(scraped_content))
+
+    wc = WordCloud(background_color='black', width=800, height=600, min_words=10, stopwords=set(STOPWORDS)).generate(text=str(scraped_content))
     plt.figure()
     plt.imshow(X=wc, aspect='auto', interpolation='bilinear')
     plt.imsave(fname='wordcloud.png', arr=wc, dpi=300)
