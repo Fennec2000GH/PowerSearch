@@ -18,7 +18,7 @@ For an easier breakdown without regex, this may be more intuitive:
 !`[url]`
 
 **optional:**<br>
-	-<br>scrape - webscrapes the url and captures only the text from important tags e.g. head, h1-h4, p
+	<br>scrape - webscrapes the url and captures only the text from important tags e.g. head, h1-h4, p
 	-<br>entities - lists meaningful topic terms and links each associated Wikipedia article reference
 	-<br>summarize - uses BERT summarizer to shorten scraped text to only the most important parts
 	-<br>topics - displays a word cloud of most frequent and thus weighted terms
